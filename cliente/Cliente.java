@@ -16,8 +16,8 @@ public class Cliente {
     public void connect() throws IOException {
         try {
             socket = new Socket();
-            socket.connect(new java.net.InetSocketAddress(host, port), 5000); // 5 seconds timeout
-            out = new PrintWriter(socket.getOutputStream(), true);
+            socket.connect(new java.net.InetSocketAddress(host, port), 5000); // Timeout 5 seg
+            out = new PrintWriter(socket.getOutputStream(), true); // autoflush activado
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             System.out.println("Conectado al servidor en " + host + ":" + port);
         } catch (java.net.ConnectException e) {
@@ -29,31 +29,16 @@ public class Cliente {
     }
 
     public String sendExpression(String expression) throws IOException {
-        // Enviar la expresión al servidor (sin añadir saltos de línea)
-        out.print(expression);
-        out.flush(); // Forzar el envío inmediato
-
-        // Leer la respuesta manualmente
-        StringBuilder response = new StringBuilder();
-        char[] buffer = new char[1024];
-        int bytesRead;
-
-        // Leer hasta que el servidor cierre la conexión o no haya más datos
-        while ((bytesRead = in.read(buffer)) != -1) {
-            response.append(buffer, 0, bytesRead);
-        }
-
-        return response.toString().trim();
+        // Enviar expresión y recibir línea con resultado
+        out.println(expression); // println añade \n
+        return in.readLine();    // espera hasta recibir \n
     }
 
     public void disconnect() {
         try {
-            if (in != null)
-                in.close();
-            if (out != null)
-                out.close();
-            if (socket != null)
-                socket.close();
+            if (in != null) in.close();
+            if (out != null) out.close();
+            if (socket != null) socket.close();
             System.out.println("Desconectado del servidor.");
         } catch (IOException e) {
             System.err.println("Error al desconectar " + e.getMessage());
@@ -61,8 +46,8 @@ public class Cliente {
     }
 
     public static void main(String[] args) {
-        String host = "localhost"; // Cambia esto si el servidor está en otra máquina
-        int port = 1301; // Cambia esto si el servidor escucha en otro puerto
+        String host = "localhost"; // o IP del servidor
+        int port = 1301;
         Cliente client = new Cliente(host, port);
         BufferedReader userInput = new BufferedReader(new InputStreamReader(System.in));
 
@@ -74,7 +59,7 @@ public class Cliente {
                 System.out.print("\nIngresa una expresión matematica (o 'EXIT' para terminar la conexión ): ");
                 String expression = userInput.readLine();
 
-                if (expression.equalsIgnoreCase("EXIT")) {
+                if (expression == null || expression.equalsIgnoreCase("EXIT")) {
                     System.out.println("Cerrando conexión...");
                     break;
                 }
