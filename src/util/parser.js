@@ -1,100 +1,96 @@
-// A través de ésta vamos a aplicar un regex para terminar de dividir cada segmento del cálculo solicitado en tokens.
-function tokenise(expr)
-{
-    const tokens = []
-    const regex = /\s*([0-9]+\.?[0-9]*|\+|\-|\*|\/|\^|\(|\))\s*/g
+function tokenise(expr) {
+    const tokens = [];
+    const regex = /\s*([0-9]+\.?[0-9]*|\+|\-|\*|\/|\^|\(|\))\s*/g;
+    let match;
 
-    let match
-
-    while ((match = regex.exec(expr)) !== null)
-    {
-        tokens.push(match[1])
+    while ((match = regex.exec(expr)) !== null) {
+        tokens.push(match[1]);
     }
 
-    return tokens
+    // Validar que todo el string fue tokenizado (evitar caracteres no permitidos)
+    const totalMatched = tokens.join('');
+    const exprSanitized = expr.replace(/\s/g, '');
+    if (totalMatched.length !== exprSanitized.length) {
+        throw new Error(`[SYNTAX ERROR] La operación "${expr}" contiene caracteres no permitidos.`);
+    }
+
+    return tokens;
 }
 
-function parse(tokens)
-{
-    // Administrar la parte del cálculo con paréntesis, o el manejo de tokens de operaciones en general.
-    function parsePrimary()
-    {
-        const token = tokens.shift()
-
-        if (token === '(')
-        {
-            const expr = parse(tokens)
-            if (tokens.shift() !== ')') throw new Error("[SYNTAX ERROR] Falta cerrar paréntesis.")
-            return expr
-        }
-
-        if (!isNaN(token))
-        {
-            return parseFloat(token)
-        }
-
-        throw new Error(`[SYNTAX ERROR] El token ${token} fue inesperado.`)
+function parse(tokens) {
+    function peek() {
+        return tokens[0] || null;
     }
 
-    // Administrar potencias.
-    function parsePower()
-    {
-        let left = parsePrimary()
-
-        while (tokens[0] === '^')
-        {
-            tokens.shift()
-            const right = parsePower()
-            left = Math.pow(left, right)
-        }
-
-        return left
+    function get() {
+        return tokens.shift();
     }
 
-    // Administrar multiplicaciones o divisiones.
-    function parseFactor()
-    {
-        let left = parsePower()
-
-        while (tokens[0] === '*' || tokens[0] === '/')
-        {
-            const op = tokens.shift()
-            const right = parsePower()
-            left = op === '*' ? left * right : left / right
+    function parseExpression() {
+        let left = parseTerm();
+        while (peek() === '+' || peek() === '-') {
+            const op = get();
+            const right = parseTerm();
+            left = op === '+' ? left + right : left - right;
         }
-
-        return left
+        return left;
     }
 
-    // Administrar operaciones de suma y resta.
-    function parseSumSubs()
-    {
-        let left = parseFactor()
-
-        while (tokens[0] === '+' || tokens[0] === '-')
-        {
-            const op = tokens.shift()
-            const right = parseFactor()
-            left = op === '+' ? left + right : left - right
+    function parseTerm() {
+        let left = parseFactor();
+        while (peek() === '*' || peek() === '/') {
+            const op = get();
+            const right = parseFactor();
+            left = op === '*' ? left * right : left / right;
         }
-
-        return left
+        return left;
     }
 
-    return parseSumSubs()
+    function parseFactor() {
+        let left = parsePower();
+        while (peek() === '^') {
+            get(); // consume ^
+            const right = parsePower();
+            left = Math.pow(left, right);
+        }
+        return left;
+    }
+
+    function parsePower() {
+        if (peek() === '(') {
+            get(); // consume '('
+            const expr = parseExpression();
+            if (get() !== ')') throw new Error('[SYNTAX ERROR] Falta el paréntesis de cierre');
+            return expr;
+        }
+
+        const token = get();
+        const value = Number(token);
+        if (isNaN(value)) throw new Error(`[SYNTAX ERROR] El token "${token}" fue inesperado.`);
+        return value;
+    }
+
+    return parseExpression();
 }
 
-// Operación de evaluación general.
-function evaluate(expr)
-{
-    // Inicialmente, tokenizar el cálculo...
-    const tokens = tokenise(expr)
-    // ...obtener el resultado...
-    const result = parse(tokens)
-    // En el caso de que sobre algún token (o caracter en general) devolver un error de sintaxis.
-    if (tokens.length > 0) throw new Error(`[SYNTAX ERROR] Sobraron los siguientes tokens: ${tokens.join(' ')}.`)
-    // Finalmente, devolver el resultado.
-    return result
+function evaluate(expr) {
+    if (!expr || expr.trim() === '') {
+        throw new Error('[SYNTAX ERROR] La operación no puede estar vacía.');
+    }
+
+    // Eliminar caracteres no imprimibles (como los que puede enviar Telnet)
+    expr = expr.replace(/[^\x20-\x7E]/g, '');
+
+    console.log(`[DEBUG] Recibido: "${expr}"`);
+
+    const tokens = tokenise(expr);
+    const result = parse(tokens);
+
+    if (tokens.length > 0) {
+        throw new Error(`[SYNTAX ERROR] Sobraron los siguientes tokens: ${tokens.join(' ')}.`);
+    }
+
+    return result;
 }
 
-module.exports = {evaluate}
+module.exports = { evaluate };

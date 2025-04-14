@@ -1,45 +1,57 @@
 // Importar net; nos ayuda con el trabajo de creación de sockets.
-const net = require('net')
-const { evaluate } = require('../util/parser')
+const net = require('net');
+
+// Asegúrate de que tienes la función 'evaluate' importada correctamente.
+const { evaluate } = require('../util/parser'); // Asegúrate de que la ruta sea correcta
 
 class Socket {
     start() {
-        // Devuelve un Promise así lo podemos manipular más adelante, pero sólamente cuando éste haya finalizado su creación.
+        // Devuelve un Promise para que podamos manipularlo cuando termine de crearse el servidor.
         return new Promise(res => {
             this.server = net.createServer(socket => {
-                // Dentro de este bloque se encontrará cada interacción con sólo un usuario.
-                console.log('[SOCKET] [INFO] Cliente conectado.')
+                // Dentro de este bloque estará la interacción con el cliente.
+                console.log('[SOCKET] [INFO] Cliente conectado.');
 
-                // Acciones al recibir algún dato, mensaje o paquete.
+                // Acción al recibir algún dato, mensaje o paquete
                 socket.on('data', data => {
-                    // En este caso, vamos a parsear el resultado de modo en el que, dependiendo si los datos coinciden
-                    // con el formato, devolvemos un número, o un error de sintaxis, según corresponda.
-                    let result
-                    try {
-                        result = evaluate(data).toString()
-                    } catch (e) {
-                        result = e.message
+                    // Convertir el dato recibido a string y eliminar espacios innecesarios
+                    let operation = data.toString().trim();
+                    console.log('[DEBUG] Operación recibida:', operation); // Log para depuración
+
+                    // Validar si la operación contiene solo números, operadores matemáticos y espacios
+                    if (!/^[\d\s\+\-\*\/\(\)\^]+$/.test(operation)) {
+                        socket.write(`[SYNTAX ERROR] La operación "${operation}" contiene caracteres no permitidos.\n`);
+                        return;
                     }
 
-                    // Finalmente, devolver el resultado que corresponda, con salto de línea.
-                    socket.write(result + '\n')
-                })
+                    let result;
+                    try {
+                        // Evaluar la operación matemática utilizando la función evaluate del parser
+                        result = evaluate(operation).toString();
+                    } catch (e) {
+                        console.log('[ERROR] Error al procesar la operación:', e.message);
+                        result = `[SYNTAX ERROR] ${e.message}`;
+                    }
 
-                // En el caso de que la conexión con el cliente finalice, vamos a implementar ésto.
+                    // Devolver el resultado o el error al cliente
+                    socket.write(result + '\n');
+                });
+
+                // Si el cliente se desconecta, imprimir un mensaje
                 socket.on('end', () => {
-                    console.log('[SOCKET] [INFO] Cliente desconectado.')
-                })
+                    console.log('[SOCKET] [INFO] Cliente desconectado.');
+                });
 
-                // Si ocurre un error en la conexión, sólo vamos a printearlo.
+                // Manejar errores en la conexión
                 socket.on('error', err => {
-                    console.log('[SOCKET] [ERROR]', err.message)
-                })
-            })
+                    console.log('[SOCKET] [ERROR]', err.message);
+                });
+            });
 
-            // Finalmente, devolver el objeto del servidor a través del Promise.
-            res(this.server)
-        })
+            // Devolver el objeto del servidor a través del Promise
+            res(this.server);
+        });
     }
 }
 
-module.exports = Socket
+module.exports = Socket;
